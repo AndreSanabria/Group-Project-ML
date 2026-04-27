@@ -11,6 +11,11 @@ class SequenceDataset:
     X: np.ndarray
     y: np.ndarray
     timestamps: np.ndarray
+    feature_names: tuple[str, ...]
+    target_column: str
+
+    def __len__(self) -> int:
+        return int(self.X.shape[0])
 
 
 def create_sliding_window_dataset(
@@ -49,5 +54,27 @@ def create_sliding_window_dataset(
         y[sample_idx] = values[target_position, target_index]
         timestamps[sample_idx] = frame.index[target_position]
 
-    return SequenceDataset(X=X, y=y, timestamps=timestamps)
+    return SequenceDataset(
+        X=X,
+        y=y,
+        timestamps=timestamps,
+        feature_names=tuple(frame.columns),
+        target_column=target_column,
+    )
 
+
+def subset_sequence_dataset(dataset: SequenceDataset, mask: np.ndarray) -> SequenceDataset:
+    if mask.dtype != bool:
+        raise ValueError("mask must be a boolean numpy array.")
+    if mask.shape[0] != len(dataset):
+        raise ValueError("mask length must match the number of sequence samples.")
+    if not mask.any():
+        raise ValueError("The selected split contains zero sequence samples.")
+
+    return SequenceDataset(
+        X=dataset.X[mask],
+        y=dataset.y[mask],
+        timestamps=dataset.timestamps[mask],
+        feature_names=dataset.feature_names,
+        target_column=dataset.target_column,
+    )

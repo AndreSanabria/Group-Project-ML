@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from src.config import ExperimentConfig
+from src.config import DEFAULT_SENTINEL_REPLACEMENTS, ExperimentConfig
 
 
 @dataclass(slots=True)
@@ -28,9 +32,42 @@ class PreparedSequenceSplits:
     normalization_stats: NormalizationStats
 
 
-def resample_to_hourly(frame: pd.DataFrame) -> pd.DataFrame:
-    hourly_frame = frame.resample("1h").mean(numeric_only=True)
-    return hourly_frame.dropna(how="all")
+def replace_sentinel_values(
+    frame: pd.DataFrame,
+    sentinel_replacements: dict[str, tuple[float, ...]] = DEFAULT_SENTINEL_REPLACEMENTS,
+    replacement_value: float = 0.0,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    cleaned_frame = frame.copy()
+    replacement_counts: dict[str, int] = {}
+
+    for column, sentinel_values in sentinel_replacements.items():
+        if column not in cleaned_frame.columns:
+            continue
+        column_mask = cleaned_frame[column].isin(sentinel_values)
+        replacement_counts[column] = int(column_mask.sum())
+        if replacement_counts[column]:
+            cleaned_frame.loc[column_mask, column] = replacement_value
+
+    return cleaned_frame, replacement_counts
+
+
+def resample_to_hourly(
+    frame: pd.DataFrame, hours: int = 1, aggregation: str = "mean"
+) -> pd.DataFrame:
+    if hours <= 0:
+        raise ValueError("hours must be a positive integer.")
+
+    resample_rule = f"{hours}h"
+    resampler = frame.resample(resample_rule)
+
+    if aggregation == "mean":
+        resampled_frame = resampler.mean(numeric_only=True)
+    elif aggregation == "median":
+        resampled_frame = resampler.median(numeric_only=True)
+    else:
+        raise ValueError("aggregation must be either 'mean' or 'median'.")
+
+    return resampled_frame.dropna(how="all")
 
 
 def select_feature_columns(
@@ -43,6 +80,69 @@ def select_feature_columns(
             f"{missing}. Available columns: {list(frame.columns)}"
         )
     return frame.loc[:, list(feature_columns)].dropna()
+
+
+def summarize_time_series_frame(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {
+            "row_count": 0,
+            "column_count": len(frame.columns),
+            "columns": list(frame.columns),
+            "start_timestamp": None,
+            "end_timestamp": None,
+            "missing_values": {column: 0 for column in frame.columns},
+            "statistics": {},
+        }
+
+    return {
+        "row_count": int(len(frame)),
+        "column_count": int(len(frame.columns)),
+        "columns": list(frame.columns),
+        "start_timestamp": frame.index.min().isoformat(),
+        "end_timestamp": frame.index.max().isoformat(),
+        "missing_values": {
+            column: int(count) for column, count in frame.isna().sum().to_dict().items()
+        },
+        "statistics": {
+            column: {
+                "mean": float(frame[column].mean()),
+                "std": float(frame[column].std(ddof=0)),
+                "min": float(frame[column].min()),
+                "max": float(frame[column].max()),
+            }
+            for column in frame.columns
+        },
+    }
+
+
+def save_summary_json(summary: dict[str, Any], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+
+def preprocess_hourly_dataset(
+    raw_frame: pd.DataFrame,
+    feature_columns: tuple[str, ...],
+    *,
+    resample_hours: int = 1,
+    aggregation: str = "mean",
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    cleaned_frame, sentinel_counts = replace_sentinel_values(raw_frame)
+    hourly_frame = resample_to_hourly(
+        cleaned_frame, hours=resample_hours, aggregation=aggregation
+    )
+    processed_frame = select_feature_columns(hourly_frame, feature_columns)
+
+    summary = {
+        "resample_hours": resample_hours,
+        "aggregation": aggregation,
+        "feature_columns": list(feature_columns),
+        "sentinel_replacements": sentinel_counts,
+        "raw_summary": summarize_time_series_frame(raw_frame),
+        "cleaned_summary": summarize_time_series_frame(cleaned_frame),
+        "processed_summary": summarize_time_series_frame(processed_frame),
+    }
+    return processed_frame, summary
 
 
 def chronological_split(
@@ -91,6 +191,7 @@ def prepare_normalized_sequence_splits(
     hourly_frame: pd.DataFrame, config: ExperimentConfig
 ) -> PreparedSequenceSplits:
     from src.sequences import create_sliding_window_dataset
+    from src.sequences import subset_sequence_dataset
 
     selected_frame = select_feature_columns(hourly_frame, config.feature_columns)
     raw_splits = chronological_split(
@@ -100,21 +201,24 @@ def prepare_normalized_sequence_splits(
         test_ratio=config.test_ratio,
     )
     normalization_stats = fit_standardizer(raw_splits.train)
-
-    normalized_train = apply_standardizer(raw_splits.train, normalization_stats)
-    normalized_val = apply_standardizer(raw_splits.val, normalization_stats)
-    normalized_test = apply_standardizer(raw_splits.test, normalization_stats)
-
-    return PreparedSequenceSplits(
-        train=create_sliding_window_dataset(
-            normalized_train, config.target_column, config.window_size, config.horizon
-        ),
-        val=create_sliding_window_dataset(
-            normalized_val, config.target_column, config.window_size, config.horizon
-        ),
-        test=create_sliding_window_dataset(
-            normalized_test, config.target_column, config.window_size, config.horizon
-        ),
-        normalization_stats=normalization_stats,
+    normalized_frame = apply_standardizer(selected_frame, normalization_stats)
+    full_sequence_dataset = create_sliding_window_dataset(
+        normalized_frame, config.target_column, config.window_size, config.horizon
     )
 
+    train_end_timestamp = np.datetime64(raw_splits.train.index[-1].to_datetime64())
+    val_end_timestamp = np.datetime64(raw_splits.val.index[-1].to_datetime64())
+
+    train_mask = full_sequence_dataset.timestamps <= train_end_timestamp
+    val_mask = (
+        (full_sequence_dataset.timestamps > train_end_timestamp)
+        & (full_sequence_dataset.timestamps <= val_end_timestamp)
+    )
+    test_mask = full_sequence_dataset.timestamps > val_end_timestamp
+
+    return PreparedSequenceSplits(
+        train=subset_sequence_dataset(full_sequence_dataset, train_mask),
+        val=subset_sequence_dataset(full_sequence_dataset, val_mask),
+        test=subset_sequence_dataset(full_sequence_dataset, test_mask),
+        normalization_stats=normalization_stats,
+    )

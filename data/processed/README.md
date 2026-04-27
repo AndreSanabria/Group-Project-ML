@@ -6,3 +6,8 @@ Default output path:
 data/processed/jena_climate_hourly.csv
 ```
 
+Default preprocessing metadata path:
+
+```text
+data/processed/jena_climate_hourly_metadata.json
+```

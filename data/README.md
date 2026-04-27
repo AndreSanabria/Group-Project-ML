@@ -16,14 +16,27 @@ data/processed/jena_climate_hourly.csv
 
 ## Workflow
 
-1. Download the ZIP file from the public link above.
-2. Extract `jena_climate_2009_2016.csv`.
-3. Place it into `data/raw/`.
-4. Run:
+1. Download and extract the dataset with:
+
+```bash
+python main.py download-data
+```
+
+2. Inspect the raw file and confirm the columns/date range:
+
+```bash
+python main.py describe-data
+```
+
+3. Build the processed hourly dataset:
 
 ```bash
 python main.py preprocess
 ```
 
-That command creates the hourly dataset used by the baseline and the manual-model training scaffolds.
+That command creates:
 
+- `data/processed/jena_climate_hourly.csv`
+- `data/processed/jena_climate_hourly_metadata.json`
+
+The preprocessing step also replaces the known `-9999.0` bad wind-velocity sentinels before resampling.

@@ -6,14 +6,22 @@ from pathlib import Path
 from src.baseline import run_persistence_baseline
 from src.config import (
     DEFAULT_FEATURE_COLUMNS,
+    DEFAULT_PROCESSED_METADATA_PATH,
     DEFAULT_PROCESSED_DATA_PATH,
+    DEFAULT_RAW_ARCHIVE_PATH,
     DEFAULT_RAW_DATA_PATH,
+    DEFAULT_RESAMPLE_HOURS,
     DEFAULT_TARGET_COLUMN,
     ExperimentConfig,
+    JENA_CLIMATE_DATA_URL,
     ensure_project_dirs,
 )
-from src.data_loader import load_time_series_csv, save_time_series_csv
-from src.preprocessing import resample_to_hourly, select_feature_columns
+from src.data_loader import download_and_extract_csv, load_time_series_csv, save_time_series_csv
+from src.preprocessing import (
+    preprocess_hourly_dataset,
+    save_summary_json,
+    summarize_time_series_frame,
+)
 from src.train_lstm import run_lstm_scaffold
 from src.train_rnn import run_rnn_scaffold
 
@@ -23,6 +31,56 @@ def parse_args() -> argparse.Namespace:
         description="Scaffolded project runner for the Jena Climate RNN/LSTM project."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    download_parser = subparsers.add_parser(
+        "download-data",
+        help="Download and extract the public Jena Climate dataset into data/raw/.",
+    )
+    download_parser.add_argument(
+        "--url",
+        default=JENA_CLIMATE_DATA_URL,
+        help="Public URL for the Jena Climate ZIP archive.",
+    )
+    download_parser.add_argument(
+        "--archive-output",
+        type=Path,
+        default=DEFAULT_RAW_ARCHIVE_PATH,
+        help="Path to save the downloaded ZIP archive.",
+    )
+    download_parser.add_argument(
+        "--csv-output",
+        type=Path,
+        default=DEFAULT_RAW_DATA_PATH,
+        help="Path to save the extracted CSV file.",
+    )
+    download_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-download and re-extract even if the files already exist.",
+    )
+
+    describe_parser = subparsers.add_parser(
+        "describe-data",
+        help="Print a summary of a raw or processed time-series CSV and optionally save it.",
+    )
+    describe_parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_RAW_DATA_PATH,
+        help="Path to the CSV to summarize.",
+    )
+    describe_parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Optional JSON path for the summary report.",
+    )
+    describe_parser.add_argument(
+        "--features",
+        nargs="+",
+        default=None,
+        help="Optional feature subset to summarize.",
+    )
 
     preprocess_parser = subparsers.add_parser(
         "preprocess", help="Convert the raw Jena CSV into an hourly processed dataset."
@@ -40,10 +98,28 @@ def parse_args() -> argparse.Namespace:
         help="Path to save the processed hourly CSV.",
     )
     preprocess_parser.add_argument(
+        "--summary-output",
+        type=Path,
+        default=DEFAULT_PROCESSED_METADATA_PATH,
+        help="Path to save preprocessing metadata as JSON.",
+    )
+    preprocess_parser.add_argument(
         "--features",
         nargs="+",
         default=list(DEFAULT_FEATURE_COLUMNS),
         help="Columns to keep in the processed dataset.",
+    )
+    preprocess_parser.add_argument(
+        "--hours",
+        type=int,
+        default=DEFAULT_RESAMPLE_HOURS,
+        help="Number of hours per resampled record.",
+    )
+    preprocess_parser.add_argument(
+        "--aggregation",
+        choices=("mean", "median"),
+        default="mean",
+        help="Aggregation to use when resampling the raw time series.",
     )
 
     baseline_parser = subparsers.add_parser(
@@ -77,6 +153,24 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=list(DEFAULT_FEATURE_COLUMNS),
         help="Feature columns to use for the experiment.",
+    )
+    baseline_parser.add_argument(
+        "--train-ratio",
+        type=float,
+        default=0.70,
+        help="Chronological training split ratio.",
+    )
+    baseline_parser.add_argument(
+        "--val-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological validation split ratio.",
+    )
+    baseline_parser.add_argument(
+        "--test-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological test split ratio.",
     )
 
     rnn_parser = subparsers.add_parser(
@@ -112,6 +206,24 @@ def parse_args() -> argparse.Namespace:
         default=list(DEFAULT_FEATURE_COLUMNS),
         help="Feature columns to use for the experiment.",
     )
+    rnn_parser.add_argument(
+        "--train-ratio",
+        type=float,
+        default=0.70,
+        help="Chronological training split ratio.",
+    )
+    rnn_parser.add_argument(
+        "--val-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological validation split ratio.",
+    )
+    rnn_parser.add_argument(
+        "--test-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological test split ratio.",
+    )
 
     lstm_parser = subparsers.add_parser(
         "train-lstm",
@@ -146,6 +258,24 @@ def parse_args() -> argparse.Namespace:
         default=list(DEFAULT_FEATURE_COLUMNS),
         help="Feature columns to use for the experiment.",
     )
+    lstm_parser.add_argument(
+        "--train-ratio",
+        type=float,
+        default=0.70,
+        help="Chronological training split ratio.",
+    )
+    lstm_parser.add_argument(
+        "--val-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological validation split ratio.",
+    )
+    lstm_parser.add_argument(
+        "--test-ratio",
+        type=float,
+        default=0.15,
+        help="Chronological test split ratio.",
+    )
 
     return parser.parse_args()
 
@@ -153,21 +283,80 @@ def parse_args() -> argparse.Namespace:
 def build_config(args: argparse.Namespace, input_path: Path) -> ExperimentConfig:
     return ExperimentConfig(
         dataset_name=input_path.name,
-        target_column=args.target_column if hasattr(args, "target_column") else DEFAULT_TARGET_COLUMN,
-        feature_columns=tuple(args.features) if hasattr(args, "features") else DEFAULT_FEATURE_COLUMNS,
+        target_column=(
+            args.target_column if hasattr(args, "target_column") else DEFAULT_TARGET_COLUMN
+        ),
+        feature_columns=(
+            tuple(args.features) if hasattr(args, "features") else DEFAULT_FEATURE_COLUMNS
+        ),
         window_size=args.window_size if hasattr(args, "window_size") else 24,
         horizon=args.horizon if hasattr(args, "horizon") else 1,
+        train_ratio=args.train_ratio if hasattr(args, "train_ratio") else 0.70,
+        val_ratio=args.val_ratio if hasattr(args, "val_ratio") else 0.15,
+        test_ratio=args.test_ratio if hasattr(args, "test_ratio") else 0.15,
+        resample_hours=args.hours if hasattr(args, "hours") else DEFAULT_RESAMPLE_HOURS,
     )
 
 
-def run_preprocess(input_path: Path, output_path: Path, features: list[str]) -> None:
+def run_download_data(
+    url: str, archive_output: Path, csv_output: Path, force: bool
+) -> None:
+    extracted_path = download_and_extract_csv(url, archive_output, csv_output, force=force)
+    print(f"Dataset ready at {extracted_path}.")
+
+
+def run_describe_data(
+    input_path: Path, output_path: Path | None, features: list[str] | None
+) -> None:
     frame = load_time_series_csv(input_path)
-    hourly_frame = resample_to_hourly(frame)
-    selected_frame = select_feature_columns(hourly_frame, tuple(features))
-    save_time_series_csv(selected_frame, output_path)
+    if features:
+        missing = [column for column in features if column not in frame.columns]
+        if missing:
+            raise ValueError(
+                f"Requested summary features are missing: {missing}. "
+                f"Available columns: {list(frame.columns)}"
+            )
+        frame = frame.loc[:, features]
+
+    summary = summarize_time_series_frame(frame)
+    if output_path is not None:
+        save_summary_json(summary, output_path)
+
+    print(
+        f"Rows={summary['row_count']}, Columns={summary['column_count']}, "
+        f"Start={summary['start_timestamp']}, End={summary['end_timestamp']}."
+    )
+    print(f"Features: {summary['columns']}")
+    if output_path is not None:
+        print(f"Summary saved to {output_path}.")
+
+
+def run_preprocess(
+    input_path: Path,
+    output_path: Path,
+    summary_output_path: Path,
+    features: list[str],
+    hours: int,
+    aggregation: str,
+) -> None:
+    frame = load_time_series_csv(input_path)
+    processed_frame, summary = preprocess_hourly_dataset(
+        frame,
+        tuple(features),
+        resample_hours=hours,
+        aggregation=aggregation,
+    )
+    save_time_series_csv(processed_frame, output_path)
+    save_summary_json(summary, summary_output_path)
     print(
         f"Saved hourly dataset to {output_path} "
-        f"with shape {selected_frame.shape} and columns {list(selected_frame.columns)}."
+        f"with shape {processed_frame.shape} and columns {list(processed_frame.columns)}."
+    )
+    print(
+        "Preprocessing summary: "
+        f"{summary['raw_summary']['row_count']} raw rows -> "
+        f"{summary['processed_summary']['row_count']} processed rows. "
+        f"Metadata saved to {summary_output_path}."
     )
 
 
@@ -205,8 +394,23 @@ def main() -> None:
     ensure_project_dirs()
     args = parse_args()
 
+    if args.command == "download-data":
+        run_download_data(args.url, args.archive_output, args.csv_output, args.force)
+        return
+
+    if args.command == "describe-data":
+        run_describe_data(args.input, args.output, args.features)
+        return
+
     if args.command == "preprocess":
-        run_preprocess(args.input, args.output, args.features)
+        run_preprocess(
+            args.input,
+            args.output,
+            args.summary_output,
+            args.features,
+            args.hours,
+            args.aggregation,
+        )
         return
 
     config = build_config(args, args.input)

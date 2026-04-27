@@ -24,16 +24,16 @@ The repository is structured around the assignment requirements:
 
 ```text
 Group-Project-ML/
-├── data/
-│   ├── README.md
-│   ├── raw/
-│   └── processed/
-├── report/
-├── results/
-├── src/
-├── main.py
-├── requirements.txt
-└── README.md
+|-- data/
+|   |-- README.md
+|   |-- raw/
+|   `-- processed/
+|-- report/
+|-- results/
+|-- src/
+|-- main.py
+|-- requirements.txt
+`-- README.md
 ```
 
 ## Quick start
@@ -45,25 +45,31 @@ Group-Project-ML/
 pip install -r requirements.txt
 ```
 
-3. Download the Jena Climate dataset and place the extracted CSV at:
+3. Download and extract the Jena Climate dataset:
 
-```text
-data/raw/jena_climate_2009_2016.csv
+```bash
+python main.py download-data
 ```
 
-4. Build the hourly dataset:
+4. Inspect the raw dataset summary:
+
+```bash
+python main.py describe-data
+```
+
+5. Build the hourly dataset:
 
 ```bash
 python main.py preprocess
 ```
 
-5. Run the persistence baseline:
+6. Run the persistence baseline:
 
 ```bash
 python main.py baseline
 ```
 
-6. Inspect the scaffolded manual-model pipeline:
+7. Inspect the scaffolded manual-model pipeline:
 
 ```bash
 python main.py train-rnn
@@ -93,8 +99,10 @@ This scaffold matches the project description by including:
 
 ## Immediate coding targets
 
+- `src/data_loader.py`: handle dataset download/extract and robust CSV parsing
+- `src/preprocessing.py`: clean sentinels, resample hourly, normalize from train-only stats, and build sequence splits
+- `src/sequences.py`: expose model-ready sliding-window arrays
 - `src/manual_rnn.py`: implement forward pass, loss, BPTT, and updates
 - `src/manual_lstm.py`: implement gates, cell state updates, loss, BPTT, and updates
 - `src/train_rnn.py`: connect the manual RNN training loop
 - `src/train_lstm.py`: connect the manual LSTM training loop
-

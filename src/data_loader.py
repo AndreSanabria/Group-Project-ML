@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
+from urllib.request import urlretrieve
+import zipfile
 
 import pandas as pd
 
@@ -33,6 +36,38 @@ def _parse_timestamp_column(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, errors="coerce")
 
 
+def download_and_extract_csv(
+    url: str,
+    archive_path: Path,
+    extracted_csv_path: Path,
+    force: bool = False,
+) -> Path:
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    extracted_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if extracted_csv_path.exists() and not force:
+        return extracted_csv_path
+
+    if force or not archive_path.exists():
+        urlretrieve(url, archive_path)
+
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        csv_members = [name for name in archive.namelist() if name.lower().endswith(".csv")]
+        if not csv_members:
+            raise ValueError(f"No CSV file found in archive: {archive_path}")
+
+        selected_member = next(
+            (name for name in csv_members if Path(name).name == extracted_csv_path.name),
+            csv_members[0],
+        )
+        with archive.open(selected_member, "r") as source, extracted_csv_path.open(
+            "wb"
+        ) as destination:
+            shutil.copyfileobj(source, destination)
+
+    return extracted_csv_path
+
+
 def load_time_series_csv(csv_path: Path) -> pd.DataFrame:
     if not csv_path.exists():
         raise FileNotFoundError(
@@ -40,7 +75,7 @@ def load_time_series_csv(csv_path: Path) -> pd.DataFrame:
             "Check data/README.md for the expected dataset location."
         )
 
-    frame = pd.read_csv(csv_path)
+    frame = pd.read_csv(csv_path, low_memory=False)
     timestamp_column = _detect_timestamp_column(frame.columns.tolist())
     timestamps = _parse_timestamp_column(frame[timestamp_column])
 
@@ -62,5 +97,6 @@ def load_time_series_csv(csv_path: Path) -> pd.DataFrame:
 
 def save_time_series_csv(frame: pd.DataFrame, csv_path: Path) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(csv_path, index_label="timestamp")
-
+    frame.sort_index().to_csv(
+        csv_path, index_label="timestamp", date_format="%Y-%m-%d %H:%M:%S"
+    )
