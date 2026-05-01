@@ -22,10 +22,13 @@ EXPERIMENT_LOG_FIELDS = [
     "hidden_size",
     "learning_rate",
     "epochs",
+    "mae_train",
+    "rmse_train",
     "mae_val",
     "rmse_val",
     "mae_test",
     "rmse_test",
+    "plot_path",
     "notes",
     "run_timestamp",
 ]
@@ -49,18 +52,40 @@ def _utc_timestamp() -> str:
 
 
 def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    return float(np.mean(np.abs(y_true - y_pred)))
+    true_values, predicted_values = _validate_regression_inputs(y_true, y_pred)
+    return float(np.mean(np.abs(true_values - predicted_values)))
 
 
 def root_mean_squared_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+    true_values, predicted_values = _validate_regression_inputs(y_true, y_pred)
+    return float(np.sqrt(np.mean((true_values - predicted_values) ** 2)))
 
 
 def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    true_values, predicted_values = _validate_regression_inputs(y_true, y_pred)
     return {
-        "mae": mean_absolute_error(y_true, y_pred),
-        "rmse": root_mean_squared_error(y_true, y_pred),
+        "mae": mean_absolute_error(true_values, predicted_values),
+        "rmse": root_mean_squared_error(true_values, predicted_values),
     }
+
+
+def _validate_regression_inputs(
+    y_true: np.ndarray, y_pred: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    true_values = np.asarray(y_true, dtype=float).reshape(-1)
+    predicted_values = np.asarray(y_pred, dtype=float).reshape(-1)
+
+    if true_values.shape != predicted_values.shape:
+        raise ValueError(
+            "y_true and y_pred must have the same shape after flattening. "
+            f"Got {true_values.shape} and {predicted_values.shape}."
+        )
+    if true_values.size == 0:
+        raise ValueError("Cannot compute regression metrics for an empty array.")
+    if not np.isfinite(true_values).all() or not np.isfinite(predicted_values).all():
+        raise ValueError("Regression metric inputs must contain only finite values.")
+
+    return true_values, predicted_values
 
 
 def next_experiment_number(csv_path: Path) -> int:
@@ -90,13 +115,27 @@ def _serialize_row(row: dict[str, Any], fieldnames: list[str]) -> dict[str, str]
 
 def append_csv_row(csv_path: Path, row: dict[str, Any], fieldnames: list[str]) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    should_write_header = not csv_path.exists() or csv_path.stat().st_size == 0
+    serialized_row = _serialize_row(row, fieldnames)
 
+    if csv_path.exists() and csv_path.stat().st_size > 0:
+        with csv_path.open("r", newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            existing_fieldnames = reader.fieldnames or []
+            existing_rows = list(reader)
+
+        if existing_fieldnames != fieldnames:
+            with csv_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                for existing_row in existing_rows:
+                    writer.writerow(_serialize_row(existing_row, fieldnames))
+
+    should_write_header = not csv_path.exists() or csv_path.stat().st_size == 0
     with csv_path.open("a", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         if should_write_header:
             writer.writeheader()
-        writer.writerow(_serialize_row(row, fieldnames))
+        writer.writerow(serialized_row)
 
 
 def build_metrics_summary_row(

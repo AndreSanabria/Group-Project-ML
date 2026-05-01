@@ -1,2 +1,5 @@
 run_name,model,split,dataset_name,target_column,window_size,horizon,mae,rmse,run_timestamp
 
+persistence_baseline,PersistenceBaseline,train,jena_climate_hourly.csv,T (degC),24,1,0.682128,0.960476,2026-05-01T07:46:03.887877+00:00
+persistence_baseline,PersistenceBaseline,val,jena_climate_hourly.csv,T (degC),24,1,0.686638,0.969979,2026-05-01T07:46:03.888674+00:00
+persistence_baseline,PersistenceBaseline,test,jena_climate_hourly.csv,T (degC),24,1,0.644599,0.902280,2026-05-01T07:46:03.889100+00:00
