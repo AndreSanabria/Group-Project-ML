@@ -31,19 +31,14 @@ class ManualLSTM:
         rng = np.random.default_rng(config.random_seed)
         concat_size = config.input_size + config.hidden_size
         self._rng = rng
-
         self.W_f = rng.normal(0.0, 0.05, size=(concat_size, config.hidden_size))
         self.b_f = np.zeros(config.hidden_size, dtype=float)
-
         self.W_i = rng.normal(0.0, 0.05, size=(concat_size, config.hidden_size))
         self.b_i = np.zeros(config.hidden_size, dtype=float)
-
         self.W_c = rng.normal(0.0, 0.05, size=(concat_size, config.hidden_size))
         self.b_c = np.zeros(config.hidden_size, dtype=float)
-
         self.W_o = rng.normal(0.0, 0.05, size=(concat_size, config.hidden_size))
         self.b_o = np.zeros(config.hidden_size, dtype=float)
-
         self.W_hy = rng.normal(0.0, 0.05, size=(config.hidden_size, config.output_size))
         self.b_y = np.zeros(config.output_size, dtype=float)
         self._last_forward_cache: dict[str, np.ndarray] | None = None
@@ -61,12 +56,10 @@ class ManualLSTM:
             for sample_index in sample_indices:
                 sequence = features[sample_index]
                 target_value = float(targets[sample_index])
-
                 hidden_states, cell_states, prediction = self._forward_sequence(sequence)
                 prediction_value = float(prediction[0])
                 error = prediction_value - target_value
                 epoch_loss += 0.5 * (error**2)
-
                 gradients = self._backward_sequence(
                     sequence, target_value, hidden_states, cell_states
                 )
@@ -163,7 +156,6 @@ class ManualLSTM:
         output_gradient = prediction - target_vector
         gradients["W_hy"] += np.outer(hidden_states[-1], output_gradient)
         gradients["b_y"] += output_gradient
-
         hidden_gradient_next = self.W_hy @ output_gradient
         cell_gradient_next = np.zeros(self.config.hidden_size, dtype=float)
 
@@ -213,7 +205,6 @@ class ManualLSTM:
             gradients["b_c"] += candidate_pre_activation_gradient
             gradients["W_o"] += np.outer(concat_vector, output_pre_activation_gradient)
             gradients["b_o"] += output_pre_activation_gradient
-
             concat_gradient = (
                 self.W_f @ forget_pre_activation_gradient
                 + self.W_i @ input_pre_activation_gradient
@@ -258,7 +249,6 @@ class ManualLSTM:
         clip_value = self.config.gradient_clip_value
         if clip_value <= 0:
             return
-
         for gradient in gradients.values():
             np.clip(gradient, -clip_value, clip_value, out=gradient)
 

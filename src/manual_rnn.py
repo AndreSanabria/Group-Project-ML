@@ -31,14 +31,11 @@ class ManualRNN:
             raise ValueError("gradient_clip must be positive.")
         if config.max_train_samples is not None and config.max_train_samples <= 0:
             raise ValueError("max_train_samples must be positive when provided.")
-
         self.config = config
         rng = np.random.default_rng(config.random_seed)
-
         self.W_xh = rng.normal(0.0, 0.05, size=(config.input_size, config.hidden_size))
         self.W_hh = rng.normal(0.0, 0.05, size=(config.hidden_size, config.hidden_size))
         self.b_h = np.zeros(config.hidden_size, dtype=float)
-
         self.W_hy = rng.normal(0.0, 0.05, size=(config.hidden_size, config.output_size))
         self.b_y = np.zeros(config.output_size, dtype=float)
 
@@ -51,13 +48,11 @@ class ManualRNN:
             sample_order = rng.permutation(X.shape[0])
             if self.config.max_train_samples is not None:
                 sample_order = sample_order[: self.config.max_train_samples]
-
             squared_errors: list[float] = []
             for sample_idx in sample_order:
                 hidden_states, output = self._forward_sequence(X[sample_idx])
                 error = float(output[0] - y[sample_idx])
                 squared_errors.append(error**2)
-
                 gradients = self._backward_sequence(
                     X[sample_idx], float(y[sample_idx]), hidden_states
                 )
@@ -115,17 +110,14 @@ class ManualRNN:
         d_output = prediction - float(target)
         gradients["W_hy"] += np.outer(hidden_states[-1], d_output)
         gradients["b_y"] += d_output
-
         d_hidden_next = self.W_hy @ d_output
         for time_idx in range(sequence.shape[0] - 1, -1, -1):
             hidden_state = hidden_states[time_idx + 1]
             previous_hidden_state = hidden_states[time_idx]
             d_raw_hidden = d_hidden_next * (1.0 - hidden_state**2)
-
             gradients["W_xh"] += np.outer(sequence[time_idx], d_raw_hidden)
             gradients["W_hh"] += np.outer(previous_hidden_state, d_raw_hidden)
             gradients["b_h"] += d_raw_hidden
-
             d_hidden_next = self.W_hh @ d_raw_hidden
 
         return gradients
@@ -144,7 +136,6 @@ class ManualRNN:
         )
         if total_norm <= self.config.gradient_clip:
             return
-
         scale = self.config.gradient_clip / (total_norm + 1e-12)
         for gradient in gradients.values():
             gradient *= scale

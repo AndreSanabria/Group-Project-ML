@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
@@ -36,7 +35,6 @@ DEFAULT_SENTINEL_REPLACEMENTS = {
     "wv (m/s)": (-9999.0,),
     "max. wv (m/s)": (-9999.0,),
 }
-
 
 @dataclass(slots=True)
 class ExperimentConfig:

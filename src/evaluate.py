@@ -9,7 +9,6 @@ import numpy as np
 
 from src.config import REPO_ROOT
 
-
 EXPERIMENT_LOG_FIELDS = [
     "experiment_number",
     "model",
@@ -178,4 +177,3 @@ def format_path_for_log(path: Path | str) -> str:
         return str(path_obj.resolve().relative_to(REPO_ROOT.resolve()))
     except ValueError:
         return str(path_obj)
-

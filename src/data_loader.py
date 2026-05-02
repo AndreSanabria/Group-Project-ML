@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
-from urllib.request import urlretrieve
 import zipfile
+from pathlib import Path
+from urllib.request import urlretrieve
 
 import pandas as pd
-
 
 TIMESTAMP_COLUMN_CANDIDATES = (
     "Date Time",

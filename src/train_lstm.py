@@ -63,10 +63,8 @@ def run_lstm_training(
             input_size=sequence_splits.train.X.shape[2],
             random_seed=config.random_seed,
         )
-
     model = ManualLSTM(model_config)
     history = model.fit(sequence_splits.train.X, sequence_splits.train.y)
-
     target_mean = float(sequence_splits.normalization_stats.means[config.target_column])
     target_std = float(sequence_splits.normalization_stats.stds[config.target_column])
 
@@ -83,10 +81,8 @@ def run_lstm_training(
         true_values = _restore_target_scale(dataset.y, config, target_mean, target_std)
         predicted_values = _restore_target_scale(predictions, config, target_mean, target_std)
         metrics = regression_metrics(true_values, predicted_values)
-
         metrics_by_split[split_name] = metrics
         predictions_by_split[split_name] = (true_values, predicted_values)
-
         summary_row = build_metrics_summary_row(
             run_name="manual_lstm",
             model="ManualLSTM",
