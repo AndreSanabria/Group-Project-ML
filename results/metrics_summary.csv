@@ -8,3 +8,6 @@ manual_rnn,ManualRNN,test,jena_climate_hourly.csv,T (degC),24,1,0.544289,0.76043
 manual_lstm,ManualLSTM,train,jena_climate_hourly.csv,T (degC),24,1,1.491273,2.039169,2026-05-02T17:11:24.951156+00:00
 manual_lstm,ManualLSTM,val,jena_climate_hourly.csv,T (degC),24,1,1.494230,2.038805,2026-05-02T17:11:29.728459+00:00
 manual_lstm,ManualLSTM,test,jena_climate_hourly.csv,T (degC),24,1,1.353822,1.835385,2026-05-02T17:11:34.456300+00:00
+manual_lstm,ManualLSTM,train,jena_climate_hourly.csv,T (degC),24,1,0.611579,0.854705,2026-05-02T17:56:17.621477+00:00
+manual_lstm,ManualLSTM,val,jena_climate_hourly.csv,T (degC),24,1,0.635068,0.880766,2026-05-02T17:56:22.174253+00:00
+manual_lstm,ManualLSTM,test,jena_climate_hourly.csv,T (degC),24,1,0.597196,0.818730,2026-05-02T17:56:26.677935+00:00
