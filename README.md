@@ -72,13 +72,13 @@ python main.py baseline
 5. Train and evaluate the manual RNN:
 
 ```bash
-python main.py train-rnn
+python main.py train-rnn --hidden-size 16 --epochs 5 --max-train-samples 10000
 ```
 
 6. Train and evaluate the manual LSTM:
 
 ```bash
-python main.py train-lstm
+python main.py train-lstm --hidden-size 16 --epochs 15 --max-train-samples 20000
 ```
 
 ## Output files
@@ -93,6 +93,8 @@ The main outputs are written to `results/`:
 Processed hourly data is written to `data/processed/jena_climate_hourly.csv`.
 The experiment log and metrics summary files are maintained as the required run
 log for recorded experiments and parameter settings.
+The tracked result files in this repository correspond to the baseline command
+above plus the RNN and LSTM commands shown in steps 5 and 6.
 
 ## Main source files
 
