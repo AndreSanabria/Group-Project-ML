@@ -23,8 +23,9 @@ from src.preprocessing import (
     summarize_time_series_frame,
 )
 from src.manual_lstm import ManualLSTMConfig
+from src.manual_rnn import ManualRNNConfig
 from src.train_lstm import run_lstm_training
-from src.train_rnn import run_rnn_scaffold
+from src.train_rnn import run_rnn_training
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,7 +177,7 @@ def parse_args() -> argparse.Namespace:
 
     rnn_parser = subparsers.add_parser(
         "train-rnn",
-        help="Prepare normalized sequence splits and initialize the manual RNN scaffold.",
+        help="Train and evaluate the manual RNN on the processed hourly dataset.",
     )
     rnn_parser.add_argument(
         "--input",
@@ -224,6 +225,36 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.15,
         help="Chronological test split ratio.",
+    )
+    rnn_parser.add_argument(
+        "--hidden-size",
+        type=int,
+        default=16,
+        help="Number of hidden units in the manual RNN.",
+    )
+    rnn_parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-3,
+        help="Learning rate for sample-wise SGD updates.",
+    )
+    rnn_parser.add_argument(
+        "--epochs",
+        type=int,
+        default=10,
+        help="Number of training epochs for the manual RNN.",
+    )
+    rnn_parser.add_argument(
+        "--gradient-clip-value",
+        type=float,
+        default=1.0,
+        help="Global gradient norm clipping value used during RNN training.",
+    )
+    rnn_parser.add_argument(
+        "--max-train-samples",
+        type=int,
+        default=20_000,
+        help="Optional cap on samples seen per epoch. Use 0 to train on all samples.",
     )
 
     lstm_parser = subparsers.add_parser(
@@ -395,14 +426,22 @@ def run_baseline(input_path: Path, config: ExperimentConfig) -> None:
     )
 
 
-def run_rnn(input_path: Path, config: ExperimentConfig) -> None:
+def run_rnn(
+    input_path: Path, config: ExperimentConfig, model_config: ManualRNNConfig
+) -> None:
     hourly_frame = load_time_series_csv(input_path)
-    scaffold = run_rnn_scaffold(hourly_frame, config)
+    artifacts = run_rnn_training(hourly_frame, config, model_config=model_config)
+    test_metrics = artifacts.metrics_by_split["test"]
+    val_metrics = artifacts.metrics_by_split["val"]
     print(
-        f"RNN scaffold ready. Train shape={scaffold.train_shape}, "
-        f"Val shape={scaffold.val_shape}, Test shape={scaffold.test_shape}. "
-        f"Next step: implement ManualRNN.fit/predict in src/manual_rnn.py."
+        f"RNN training complete. Train shape={artifacts.train_shape}, "
+        f"Val shape={artifacts.val_shape}, Test shape={artifacts.test_shape}."
     )
+    print(
+        f"Validation MAE={val_metrics['mae']:.4f}, Validation RMSE={val_metrics['rmse']:.4f}, "
+        f"Test MAE={test_metrics['mae']:.4f}, Test RMSE={test_metrics['rmse']:.4f}."
+    )
+    print(f"Predictions plot saved to {artifacts.plot_path}.")
 
 
 def run_lstm(
@@ -450,7 +489,18 @@ def main() -> None:
     if args.command == "baseline":
         run_baseline(args.input, config)
     elif args.command == "train-rnn":
-        run_rnn(args.input, config)
+        model_config = ManualRNNConfig(
+            input_size=len(config.feature_columns),
+            hidden_size=args.hidden_size,
+            learning_rate=args.learning_rate,
+            epochs=args.epochs,
+            random_seed=config.random_seed,
+            gradient_clip=args.gradient_clip_value,
+            max_train_samples=(
+                args.max_train_samples if args.max_train_samples > 0 else None
+            ),
+        )
+        run_rnn(args.input, config, model_config)
     elif args.command == "train-lstm":
         model_config = ManualLSTMConfig(
             input_size=len(config.feature_columns),

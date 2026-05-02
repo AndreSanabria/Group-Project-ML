@@ -69,20 +69,20 @@ python main.py preprocess
 python main.py baseline
 ```
 
-7. Inspect the scaffolded manual-model pipeline:
+7. Train the manual models:
 
 ```bash
 python main.py train-rnn
 python main.py train-lstm
 ```
 
-`python main.py train-rnn` still prepares normalized sequence splits for the RNN scaffold. `python main.py train-lstm` now trains and evaluates the manual LSTM, appends metrics to the experiment logs, and saves a predictions plot.
+`python main.py train-rnn` and `python main.py train-lstm` now train and evaluate the manual sequence models, append metrics to the experiment logs, and save prediction and residual plots.
 
 ## Default workflow
 
 1. Preprocess raw 10-minute data into hourly data.
 2. Run the persistence baseline and log RMSE/MAE.
-3. Implement the manual RNN in [src/manual_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_rnn.py).
+3. Train and evaluate the manual RNN in [src/manual_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_rnn.py) and [src/train_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/train_rnn.py).
 4. Train and evaluate the manual LSTM in [src/manual_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_lstm.py) and [src/train_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/train_lstm.py).
 5. Save plots and metrics in `results/`.
 6. Write the final report in IEEE format and export it to `report/`.
@@ -97,12 +97,12 @@ This scaffold matches the project description by including:
 - a report folder for the final PDF
 - separation between preprocessing/evaluation utilities and the manual model code
 
-## Immediate coding targets
+## Core implementation files
 
 - `src/data_loader.py`: handle dataset download/extract and robust CSV parsing
 - `src/preprocessing.py`: clean sentinels, resample hourly, normalize from train-only stats, and build sequence splits
 - `src/sequences.py`: expose model-ready sliding-window arrays
-- `src/manual_rnn.py`: implement forward pass, loss, BPTT, and updates
-- `src/manual_lstm.py`: manual LSTM forward pass, BPTT, and SGD updates
-- `src/train_rnn.py`: connect the manual RNN training loop
+- `src/manual_rnn.py`: manual many-to-one RNN regressor with BPTT and SGD updates
+- `src/manual_lstm.py`: manual many-to-one LSTM regressor with BPTT and SGD updates
+- `src/train_rnn.py`: train, evaluate, and log manual RNN experiments
 - `src/train_lstm.py`: train, evaluate, and log manual LSTM experiments
