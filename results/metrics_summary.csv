@@ -1,2 +1,4 @@
 run_name,model,split,dataset_name,target_column,window_size,horizon,mae,rmse,run_timestamp
 
+manual_rnn,ManualRNN,val,jena_climate_hourly.csv,T (degC),24,1,0.482367,0.699025,2026-05-01T18:22:31.071136+00:00
+manual_rnn,ManualRNN,test,jena_climate_hourly.csv,T (degC),24,1,0.456073,0.642662,2026-05-01T18:22:31.071640+00:00
