@@ -13,12 +13,17 @@ from src.evaluate import (
     append_csv_row,
     build_experiment_log_row,
     build_metrics_summary_row,
+    format_path_for_log,
     next_experiment_number,
     regression_metrics,
 )
 from src.plots import plot_predictions, plot_residuals
 from src.preprocessing import chronological_split, select_feature_columns
-from src.sequences import SequenceDataset, create_sliding_window_dataset
+from src.sequences import (
+    SequenceDataset,
+    create_sliding_window_dataset,
+    subset_sequence_dataset,
+)
 
 
 @dataclass(slots=True)
@@ -43,17 +48,40 @@ def persistence_predict(dataset: SequenceDataset, target_index: int) -> np.ndarr
     return dataset.X[:, -1, target_index]
 
 
-def evaluate_split(
+def evaluate_split(dataset: SequenceDataset, feature_names: tuple[str, ...]) -> SplitEvaluation:
+    target_index = feature_names.index(dataset.target_column)
+    predictions = persistence_predict(dataset, target_index)
+    metrics = regression_metrics(dataset.y, predictions)
+    return SplitEvaluation(dataset=dataset, predictions=predictions, metrics=metrics)
+
+
+def build_chronological_sequence_splits(
     frame: pd.DataFrame,
     target_column: str,
     window_size: int,
     horizon: int,
-) -> SplitEvaluation:
-    dataset = create_sliding_window_dataset(frame, target_column, window_size, horizon)
-    target_index = frame.columns.get_loc(target_column)
-    predictions = persistence_predict(dataset, target_index)
-    metrics = regression_metrics(dataset.y, predictions)
-    return SplitEvaluation(dataset=dataset, predictions=predictions, metrics=metrics)
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> dict[str, SequenceDataset]:
+    raw_splits = chronological_split(frame, train_ratio, val_ratio, test_ratio)
+    full_dataset = create_sliding_window_dataset(frame, target_column, window_size, horizon)
+
+    train_end_timestamp = np.datetime64(raw_splits.train.index[-1].to_datetime64())
+    val_end_timestamp = np.datetime64(raw_splits.val.index[-1].to_datetime64())
+
+    train_mask = full_dataset.timestamps <= train_end_timestamp
+    val_mask = (
+        (full_dataset.timestamps > train_end_timestamp)
+        & (full_dataset.timestamps <= val_end_timestamp)
+    )
+    test_mask = full_dataset.timestamps > val_end_timestamp
+
+    return {
+        "train": subset_sequence_dataset(full_dataset, train_mask),
+        "val": subset_sequence_dataset(full_dataset, val_mask),
+        "test": subset_sequence_dataset(full_dataset, test_mask),
+    }
 
 
 def run_persistence_baseline(
@@ -65,23 +93,19 @@ def run_persistence_baseline(
     residuals_plot_path: Path = RESULTS_DIR / "baseline_residuals.png",
 ) -> BaselineArtifacts:
     selected_frame = select_feature_columns(hourly_frame, config.feature_columns)
-    splits = chronological_split(
+    sequence_splits = build_chronological_sequence_splits(
         selected_frame,
+        target_column=config.target_column,
+        window_size=config.window_size,
+        horizon=config.horizon,
         train_ratio=config.train_ratio,
         val_ratio=config.val_ratio,
         test_ratio=config.test_ratio,
     )
 
     split_results = {
-        "train": evaluate_split(
-            splits.train, config.target_column, config.window_size, config.horizon
-        ),
-        "val": evaluate_split(
-            splits.val, config.target_column, config.window_size, config.horizon
-        ),
-        "test": evaluate_split(
-            splits.test, config.target_column, config.window_size, config.horizon
-        ),
+        split_name: evaluate_split(dataset, tuple(selected_frame.columns))
+        for split_name, dataset in sequence_splits.items()
     }
 
     for split_name, split_result in split_results.items():
@@ -114,7 +138,7 @@ def run_persistence_baseline(
         rmse_val=f"{split_results['val'].metrics['rmse']:.6f}",
         mae_test=f"{split_results['test'].metrics['mae']:.6f}",
         rmse_test=f"{split_results['test'].metrics['rmse']:.6f}",
-        plot_path=predictions_plot_path,
+        plot_path=format_path_for_log(predictions_plot_path),
         notes=(
             "Persistence baseline: predict the next target value as the most recent "
             "target observed in the input window."

@@ -13,6 +13,6 @@ Recommended plot names:
 - `rnn_predictions.png`
 - `lstm_predictions.png`
 
-The persistence baseline appends MAE/RMSE values to both CSV files and records
-the generated prediction plot path in `experiment_log.csv`.
+The tracked CSV files in this folder are templates. Regenerate them from the
+current codebase before treating any metrics as final project results.
 

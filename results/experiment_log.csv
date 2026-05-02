@@ -1,3 +1,1 @@
 experiment_number,model,dataset_name,target_column,feature_columns,window_size,horizon,train_ratio,val_ratio,test_ratio,hidden_size,learning_rate,epochs,mae_train,rmse_train,mae_val,rmse_val,mae_test,rmse_test,plot_path,notes,run_timestamp
-
-1,PersistenceBaseline,jena_climate_hourly.csv,T (degC),T (degC) | p (mbar) | rh (%) | wv (m/s) | wd (deg),24,1,0.7,0.15,0.15,,,,0.682128,0.960476,0.686638,0.969979,0.644599,0.902280,C:\Users\jorid\OneDrive\Documents\Group-Project-ML\results\baseline_predictions.png,Persistence baseline: predict the next target value as the most recent target observed in the input window.,2026-05-01T07:46:03.889816+00:00

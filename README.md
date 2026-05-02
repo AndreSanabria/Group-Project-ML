@@ -76,14 +76,14 @@ python main.py train-rnn
 python main.py train-lstm
 ```
 
-Those last two commands currently prepare normalized sequence splits and initialize model stubs. They are intentionally not full training runs yet because the manual algorithm implementation still needs to be filled in by the team.
+`python main.py train-rnn` still prepares normalized sequence splits for the RNN scaffold. `python main.py train-lstm` now trains and evaluates the manual LSTM, appends metrics to the experiment logs, and saves a predictions plot.
 
 ## Default workflow
 
 1. Preprocess raw 10-minute data into hourly data.
 2. Run the persistence baseline and log RMSE/MAE.
 3. Implement the manual RNN in [src/manual_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_rnn.py).
-4. Implement the manual LSTM in [src/manual_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_lstm.py).
+4. Train and evaluate the manual LSTM in [src/manual_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_lstm.py) and [src/train_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/train_lstm.py).
 5. Save plots and metrics in `results/`.
 6. Write the final report in IEEE format and export it to `report/`.
 
@@ -103,6 +103,6 @@ This scaffold matches the project description by including:
 - `src/preprocessing.py`: clean sentinels, resample hourly, normalize from train-only stats, and build sequence splits
 - `src/sequences.py`: expose model-ready sliding-window arrays
 - `src/manual_rnn.py`: implement forward pass, loss, BPTT, and updates
-- `src/manual_lstm.py`: implement gates, cell state updates, loss, BPTT, and updates
+- `src/manual_lstm.py`: manual LSTM forward pass, BPTT, and SGD updates
 - `src/train_rnn.py`: connect the manual RNN training loop
-- `src/train_lstm.py`: connect the manual LSTM training loop
+- `src/train_lstm.py`: train, evaluate, and log manual LSTM experiments

@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from src.config import REPO_ROOT
+
 
 EXPERIMENT_LOG_FIELDS = [
     "experiment_number",
@@ -168,4 +170,12 @@ def build_experiment_log_row(**kwargs: Any) -> dict[str, Any]:
     row.update(kwargs)
     row["run_timestamp"] = row.get("run_timestamp") or _utc_timestamp()
     return row
+
+
+def format_path_for_log(path: Path | str) -> str:
+    path_obj = Path(path)
+    try:
+        return str(path_obj.resolve().relative_to(REPO_ROOT.resolve()))
+    except ValueError:
+        return str(path_obj)
 

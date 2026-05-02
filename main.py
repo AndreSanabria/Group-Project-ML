@@ -22,7 +22,8 @@ from src.preprocessing import (
     save_summary_json,
     summarize_time_series_frame,
 )
-from src.train_lstm import run_lstm_scaffold
+from src.manual_lstm import ManualLSTMConfig
+from src.train_lstm import run_lstm_training
 from src.train_rnn import run_rnn_scaffold
 
 
@@ -227,7 +228,7 @@ def parse_args() -> argparse.Namespace:
 
     lstm_parser = subparsers.add_parser(
         "train-lstm",
-        help="Prepare normalized sequence splits and initialize the manual LSTM scaffold.",
+        help="Train and evaluate the manual LSTM on the processed hourly dataset.",
     )
     lstm_parser.add_argument(
         "--input",
@@ -275,6 +276,30 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.15,
         help="Chronological test split ratio.",
+    )
+    lstm_parser.add_argument(
+        "--hidden-size",
+        type=int,
+        default=32,
+        help="Number of hidden units in the manual LSTM.",
+    )
+    lstm_parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-3,
+        help="Learning rate for sample-wise SGD updates.",
+    )
+    lstm_parser.add_argument(
+        "--epochs",
+        type=int,
+        default=25,
+        help="Number of training epochs for the manual LSTM.",
+    )
+    lstm_parser.add_argument(
+        "--gradient-clip-value",
+        type=float,
+        default=5.0,
+        help="Absolute gradient clipping value used during LSTM training.",
     )
 
     return parser.parse_args()
@@ -380,14 +405,22 @@ def run_rnn(input_path: Path, config: ExperimentConfig) -> None:
     )
 
 
-def run_lstm(input_path: Path, config: ExperimentConfig) -> None:
+def run_lstm(
+    input_path: Path, config: ExperimentConfig, model_config: ManualLSTMConfig
+) -> None:
     hourly_frame = load_time_series_csv(input_path)
-    scaffold = run_lstm_scaffold(hourly_frame, config)
+    artifacts = run_lstm_training(hourly_frame, config, model_config=model_config)
+    test_metrics = artifacts.metrics_by_split["test"]
+    val_metrics = artifacts.metrics_by_split["val"]
     print(
-        f"LSTM scaffold ready. Train shape={scaffold.train_shape}, "
-        f"Val shape={scaffold.val_shape}, Test shape={scaffold.test_shape}. "
-        f"Next step: implement ManualLSTM.fit/predict in src/manual_lstm.py."
+        f"LSTM training complete. Train shape={artifacts.train_shape}, "
+        f"Val shape={artifacts.val_shape}, Test shape={artifacts.test_shape}."
     )
+    print(
+        f"Validation MAE={val_metrics['mae']:.4f}, Validation RMSE={val_metrics['rmse']:.4f}, "
+        f"Test MAE={test_metrics['mae']:.4f}, Test RMSE={test_metrics['rmse']:.4f}."
+    )
+    print(f"Predictions plot saved to {artifacts.plot_path}.")
 
 
 def main() -> None:
@@ -419,7 +452,15 @@ def main() -> None:
     elif args.command == "train-rnn":
         run_rnn(args.input, config)
     elif args.command == "train-lstm":
-        run_lstm(args.input, config)
+        model_config = ManualLSTMConfig(
+            input_size=len(config.feature_columns),
+            hidden_size=args.hidden_size,
+            learning_rate=args.learning_rate,
+            epochs=args.epochs,
+            random_seed=config.random_seed,
+            gradient_clip_value=args.gradient_clip_value,
+        )
+        run_lstm(args.input, config, model_config)
     else:
         raise ValueError(f"Unsupported command: {args.command}")
 
