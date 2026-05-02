@@ -1,34 +1,32 @@
-# Group Project ML
+# Weather Forecasting with Manual RNN and LSTM
 
-Project scaffold for the ML course final project on `RNN/LSTM for time series prediction` using the Jena Climate dataset.
+This project uses the Jena Climate dataset to predict future temperature from
+historical weather observations. The implementation compares a persistence
+baseline against a manually implemented RNN and a manually implemented LSTM.
 
-The repository is structured around the assignment requirements:
+The dataset is not included in this repository. Use the public dataset URL and
+the provided download command so the code can be run without bundling large
+data files inside the submission.
 
-- manual implementation of the main learning algorithms
-- public dataset link instead of committing raw data
-- reproducible run instructions
-- results artifacts and experiment logs
-- report support for the final IEEE-format submission
+## Problem setup
 
-## Proposed project scope
-
-- Task: predict future temperature from historical weather data
 - Dataset: Jena Climate
-- Resampling: hourly averages
-- Default target: `T (degC)`
-- Default window: previous 24 hours
-- Default horizon: next 1 hour
-- Comparison: persistence baseline vs manual RNN vs manual LSTM
+- Dataset URL: `https://storage.googleapis.com/tensorflow/tf-keras-datasets/jena_climate_2009_2016.csv.zip`
+- Target variable: `T (degC)`
+- Default input window: previous 24 hourly observations
+- Default forecast horizon: next 1 hour
+- Default comparison: Persistence Baseline vs Manual RNN vs Manual LSTM
 
-## Repository layout
+The raw dataset is recorded every 10 minutes. This project resamples it to
+hourly data before training.
+
+## Repository structure
 
 ```text
 Group-Project-ML/
 |-- data/
-|   |-- README.md
 |   |-- raw/
 |   `-- processed/
-|-- report/
 |-- results/
 |-- src/
 |-- main.py
@@ -36,7 +34,7 @@ Group-Project-ML/
 `-- README.md
 ```
 
-## Quick start
+## Setup
 
 1. Create and activate a virtual environment.
 2. Install dependencies:
@@ -45,64 +43,64 @@ Group-Project-ML/
 pip install -r requirements.txt
 ```
 
-3. Download and extract the Jena Climate dataset:
+## Run order
+
+1. Download the dataset:
 
 ```bash
 python main.py download-data
 ```
 
-4. Inspect the raw dataset summary:
+2. Inspect the raw file:
 
 ```bash
 python main.py describe-data
 ```
 
-5. Build the hourly dataset:
+3. Preprocess the dataset into hourly observations:
 
 ```bash
 python main.py preprocess
 ```
 
-6. Run the persistence baseline:
+4. Run the persistence baseline:
 
 ```bash
 python main.py baseline
 ```
 
-7. Train the manual models:
+5. Train and evaluate the manual RNN:
 
 ```bash
 python main.py train-rnn
+```
+
+6. Train and evaluate the manual LSTM:
+
+```bash
 python main.py train-lstm
 ```
 
-`python main.py train-rnn` and `python main.py train-lstm` now train and evaluate the manual sequence models, append metrics to the experiment logs, and save prediction and residual plots.
+## Output files
 
-## Default workflow
+The main outputs are written to `results/`:
 
-1. Preprocess raw 10-minute data into hourly data.
-2. Run the persistence baseline and log RMSE/MAE.
-3. Train and evaluate the manual RNN in [src/manual_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_rnn.py) and [src/train_rnn.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/train_rnn.py).
-4. Train and evaluate the manual LSTM in [src/manual_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/manual_lstm.py) and [src/train_lstm.py](/c:/Users/17372/Desktop/ML Assignment 3/Group-Project-ML/src/train_lstm.py).
-5. Save plots and metrics in `results/`.
-6. Write the final report in IEEE format and export it to `report/`.
+- `experiment_log.csv`
+- `metrics_summary.csv`
+- prediction plots for baseline, RNN, and LSTM
+- residual plots for RNN and LSTM
 
-## Assignment alignment
+Processed hourly data is written to `data/processed/jena_climate_hourly.csv`.
+The experiment log and metrics summary files are maintained as the required run
+log for recorded experiments and parameter settings.
 
-This scaffold matches the project description by including:
+## Main source files
 
-- code with clear run instructions
-- a place to record experiment parameters and outcomes
-- a results folder for plots and summary metrics
-- a report folder for the final PDF
-- separation between preprocessing/evaluation utilities and the manual model code
-
-## Core implementation files
-
-- `src/data_loader.py`: handle dataset download/extract and robust CSV parsing
-- `src/preprocessing.py`: clean sentinels, resample hourly, normalize from train-only stats, and build sequence splits
-- `src/sequences.py`: expose model-ready sliding-window arrays
-- `src/manual_rnn.py`: manual many-to-one RNN regressor with BPTT and SGD updates
-- `src/manual_lstm.py`: manual many-to-one LSTM regressor with BPTT and SGD updates
-- `src/train_rnn.py`: train, evaluate, and log manual RNN experiments
-- `src/train_lstm.py`: train, evaluate, and log manual LSTM experiments
+- `src/data_loader.py`: dataset download and CSV loading
+- `src/preprocessing.py`: cleaning, hourly resampling, normalization, and splits
+- `src/sequences.py`: sliding-window sequence generation
+- `src/baseline.py`: persistence baseline
+- `src/manual_rnn.py`: manual many-to-one RNN implementation
+- `src/manual_lstm.py`: manual many-to-one LSTM implementation
+- `src/train_rnn.py`: RNN training and evaluation
+- `src/train_lstm.py`: LSTM training and evaluation

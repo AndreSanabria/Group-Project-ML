@@ -122,7 +122,8 @@ def run_lstm_training(
         plot_path=format_path_for_log(predictions_plot_path),
         notes=(
             "Manual many-to-one LSTM regressor trained with sample-wise SGD and "
-            "backpropagation through time."
+            "backpropagation through time. "
+            f"max_train_samples={model_config.max_train_samples}."
         ),
     )
     append_csv_row(experiment_log_path, experiment_row, EXPERIMENT_LOG_FIELDS)

@@ -1,2 +1,1 @@
-"""Source package for the Group Project ML scaffold."""
-
+"""Source package for the Group Project ML codebase."""

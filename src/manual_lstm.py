@@ -14,14 +14,19 @@ class ManualLSTMConfig:
     epochs: int = 25
     random_seed: int = 42
     gradient_clip_value: float = 5.0
+    max_train_samples: int | None = 20_000
 
 
 class ManualLSTM:
-    """Scaffold for a manually implemented many-to-one LSTM regressor."""
+    """Manually implemented many-to-one LSTM regressor."""
 
     def __init__(self, config: ManualLSTMConfig) -> None:
         if config.output_size != 1:
             raise ValueError("ManualLSTM currently supports only a single regression output.")
+        if config.learning_rate <= 0 or config.epochs <= 0:
+            raise ValueError("learning_rate and epochs must both be positive.")
+        if config.max_train_samples is not None and config.max_train_samples <= 0:
+            raise ValueError("max_train_samples must be positive when provided.")
         self.config = config
         rng = np.random.default_rng(config.random_seed)
         concat_size = config.input_size + config.hidden_size
@@ -49,6 +54,8 @@ class ManualLSTM:
 
         for _ in range(self.config.epochs):
             sample_indices = self._rng.permutation(features.shape[0])
+            if self.config.max_train_samples is not None:
+                sample_indices = sample_indices[: self.config.max_train_samples]
             epoch_loss = 0.0
 
             for sample_index in sample_indices:
@@ -65,7 +72,7 @@ class ManualLSTM:
                 )
                 self._apply_gradients(gradients)
 
-            history["train_loss"].append(epoch_loss / features.shape[0])
+            history["train_loss"].append(epoch_loss / sample_indices.shape[0])
 
         return history
 

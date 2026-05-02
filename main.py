@@ -30,7 +30,7 @@ from src.train_rnn import run_rnn_training
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Scaffolded project runner for the Jena Climate RNN/LSTM project."
+        description="Command-line runner for the Jena Climate RNN/LSTM project."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -332,6 +332,12 @@ def parse_args() -> argparse.Namespace:
         default=5.0,
         help="Absolute gradient clipping value used during LSTM training.",
     )
+    lstm_parser.add_argument(
+        "--max-train-samples",
+        type=int,
+        default=20_000,
+        help="Optional cap on samples seen per epoch. Use 0 to train on all samples.",
+    )
 
     return parser.parse_args()
 
@@ -509,6 +515,9 @@ def main() -> None:
             epochs=args.epochs,
             random_seed=config.random_seed,
             gradient_clip_value=args.gradient_clip_value,
+            max_train_samples=(
+                args.max_train_samples if args.max_train_samples > 0 else None
+            ),
         )
         run_lstm(args.input, config, model_config)
     else:

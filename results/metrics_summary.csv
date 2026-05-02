@@ -1,1 +1,10 @@
 run_name,model,split,dataset_name,target_column,window_size,horizon,mae,rmse,run_timestamp
+persistence_baseline,PersistenceBaseline,train,jena_climate_hourly.csv,T (degC),24,1,0.682128,0.960476,2026-05-02T17:10:15.984950+00:00
+persistence_baseline,PersistenceBaseline,val,jena_climate_hourly.csv,T (degC),24,1,0.687024,0.970567,2026-05-02T17:10:15.985958+00:00
+persistence_baseline,PersistenceBaseline,test,jena_climate_hourly.csv,T (degC),24,1,0.643912,0.901462,2026-05-02T17:10:15.991975+00:00
+manual_rnn,ManualRNN,train,jena_climate_hourly.csv,T (degC),24,1,0.590783,0.836971,2026-05-02T17:10:39.092610+00:00
+manual_rnn,ManualRNN,val,jena_climate_hourly.csv,T (degC),24,1,0.588657,0.840739,2026-05-02T17:10:39.891811+00:00
+manual_rnn,ManualRNN,test,jena_climate_hourly.csv,T (degC),24,1,0.544289,0.760433,2026-05-02T17:10:40.638371+00:00
+manual_lstm,ManualLSTM,train,jena_climate_hourly.csv,T (degC),24,1,1.491273,2.039169,2026-05-02T17:11:24.951156+00:00
+manual_lstm,ManualLSTM,val,jena_climate_hourly.csv,T (degC),24,1,1.494230,2.038805,2026-05-02T17:11:29.728459+00:00
+manual_lstm,ManualLSTM,test,jena_climate_hourly.csv,T (degC),24,1,1.353822,1.835385,2026-05-02T17:11:34.456300+00:00
